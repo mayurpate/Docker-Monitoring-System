@@ -1,0 +1,163 @@
+<html>
+<head>
+
+
+<title>Docker Monitoring System</title>
+<script src="https://code.jquery.com/jquery-3.1.1.js"></script>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script src="http://ajax.aspnetcdn.com/ajax/jquery.templates/beta1/jquery.tmpl.js"></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/exporting.js"></script>
+
+</head>
+
+
+<body style="background-color:azure">
+    <div id="first-div" style="text-align:center">
+        <img src="https://www.docker.com/sites/default/files/moby.svg" alt="Docker" style="height:200px;">
+        <h1 style="color:#0e2479">DocSnap - Docker Monitoring System</h1>
+    </div>
+    <div style="margin:45px 0px 0px 80px">
+        <label for="host_id" style="font-size:19px">Enter Docker Instance IP Address</label>
+        <div class="input-group input-group-lg" style="width:500px">
+            <input id="host_id" type="text" class="form-control" placeholder="127.0.0.1" aria-describedby="sizing-addon1">
+        </div>
+        <button onclick="fetch_details()" class="btn btn-default" id="details" type="button" style="margin-top:13px;width:125px;height:45px;font-weight:bold;font-size:17px">Get Details</button>
+        <div style="margin-top:15px" id="detail_div">
+            <label id="m_title" style="display:none;font-size:25px;">Machine Details</label>
+            <table style="width:50%" id="machine_info" border-collapse="collapse">
+            </table>
+            <label id="c_title" style="display:none;font-size:25px;">Running Containers</label>
+            <table style="width:50%" id="container_info" border-collapse="collapse">
+            </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="stats_modal">
+        <div class="modal-dialog" role="document" style="width:60%">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                    <h4 class="modal-title">Container Metrics</h4>
+                </div>
+                <div class="modal-body">
+                    <div id="cpu_stats" style="position:inherit;width:55%;height:30%;">
+                    </div>
+                    <div id="memory_stats" style="position:inherit;width:55%;height:30%;">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div><!-- /.modal-content -->
+        </div><!-- /.modal-dialog -->
+    </div>
+
+    <script id="machineTemplate" type="text/x-jQuery-tmpl">
+        <tr style="font-size:19px;">
+            <td style="padding-bottom:10px;">${k}</td>
+            <td style="padding-bottom:10px;">${v}</td>
+        <tr>
+    </script>
+
+    <script id="containerTemplate" type="text/x-jQuery-tmpl">
+        <tr style="font-size:19px;">
+            <td onclick="open_modal(this.id)" id='${id}' style="padding-bottom:10px;cursor:pointer;color:blue;text-decoration:underline">${name}</td>
+            <td style="padding-bottom:10px;">${image}</td>
+        <tr>
+    </script>
+
+    <script type="text/javascript">
+    </script>
+    
+    <script type="text/javascript">
+        function open_modal(id){
+                params = {'container_id' : id};
+                $.ajax({
+                    url: "/docker_controller/get_container_details", 
+                    data:params,
+                    success: function(result){
+                                   var result = JSON.parse(result);
+                                   console.log(result);
+                                   $(function () {
+                                       Highcharts.chart('cpu_stats', {
+                                               chart: {type: 'line'},
+                                               title: {text: 'CPU Utilization'},
+                                               subtitle: {text: 'Source: DocSnap Monitoring'},
+                                               xAxis: {categories: result.time_series},
+                                               yAxis: {title: {text: 'CPU Load Factor'}},
+                                               plotOptions: {line: {dataLabels: {enabled: true},
+                                                                                enableMouseTracking: false}},
+                                               series: [{
+                                                            name: 'CPU Metrics',
+                                                            data: result.cpu_stats
+                                                    }]
+                                           });
+                                   });
+
+                                   $(function () {
+                                       Highcharts.chart('memory_stats', {
+                                               chart: {type: 'line'},
+                                               title: {text: 'Memory Utilization'},
+                                               subtitle: {text: 'Source: DocSnap Monitoring'},
+                                               xAxis: {categories: result.time_series},
+                                               yAxis: {title: {text: 'Memory (KB)'}},
+                                               plotOptions: {line: {dataLabels: {enabled: true},
+                                                                                enableMouseTracking: false}},
+                                               series: [{
+                                                            name: 'Memory',
+                                                            data: result.memory_stats
+                                                        }]
+                                           });
+                                   });
+                            }
+                });
+               $('#stats_modal').modal('show');
+        }
+
+        function fetch_details()
+        {
+            host_ip = $("#host_id").val()
+            
+            if(host_ip == ""){
+                window.alert("Enter Some IP address");
+                $("#machine_info").html("");
+                $("#container_info").html("");
+                return
+            }
+            params = {'host_ip': host_ip};
+            $.ajax({
+                url: "/docker_controller/get_host_details", 
+                data:params,
+                success: function(result){
+                            console.log(result);
+                            var result = JSON.parse(result);
+                            if(result.success == false){
+                                $("#machine_info").html("");
+                                $("#container_info").html("");
+                                window.alert("No data found for given IP address.");
+                            }
+                            else{
+                                result_list = result.machine_info;
+                                container_list = result.containers;
+                                $("#m_title").show();
+                                $("#machineTemplate").tmpl(result_list).appendTo("#machine_info");
+                                $("#c_title").show();
+                                $("#containerTemplate").tmpl(container_list).appendTo("#container_info");
+                                //window.alert("Ajax Success");
+                            }
+                        }
+            });
+            //write re for checking valid IP    
+        }
+    </script>
+</body>
+</html>
+
+
+
